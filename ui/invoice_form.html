@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --bg: #f6f5f2;
+        --card: #ffffff;
+        --ink: #222831;
+        --muted: #5f6b7a;
+        --accent: #c26d1f;
+        --ok: #1f7a5c;
+        --line: #e6e1d9;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: radial-gradient(circle at 20% 0%, #fff7ea 0, var(--bg) 45%);
+        color: var(--ink);
+        font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      }
+      .wrap { padding: 16px; }
+      .title { margin: 0 0 12px; font-size: 18px; letter-spacing: 0.03em; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .field { display: flex; flex-direction: column; gap: 4px; }
+      .field.full { grid-column: 1 / -1; }
+      label { font-size: 12px; color: var(--muted); }
+      input, select, textarea {
+        width: 100%; border: 1px solid #d5dce6; border-radius: 8px;
+        padding: 8px; font-size: 13px; background: #fff;
+      }
+      textarea { min-height: 64px; resize: vertical; }
+      .line-row {
+        border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+        margin-bottom: 8px; background: #fffdf8; overflow-x: auto;
+      }
+      .line-head { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+      .line-grid { display: grid; grid-template-columns: minmax(180px,2fr) minmax(84px,1fr) minmax(84px,1fr) minmax(140px,1.3fr); gap: 8px; min-width: 620px; }
+      .line-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+      .row-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+      button { border: none; border-radius: 10px; padding: 9px 12px; cursor: pointer; font-weight: 600; }
+      button:disabled { opacity: 0.6; cursor: wait; }
+      .btn-main { background: var(--accent); color: #fff; width: 100%; }
+      .btn-sub { background: #eef2f7; color: #334155; }
+      .btn-danger { background: #fff1f1; color: #b42318; }
+      .status { margin-top: 10px; font-size: 12px; color: var(--muted); white-space: pre-line; }
+      .status.ok { color: var(--ok); }
+      a { color: #1d4ed8; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1 class="title">帳票作成 UI</h1>
+
+      <div class="card">
+        <div class="grid">
+          <div class="field full"><label>取引先</label><select id="client"></select></div>
+          <div class="field full"><label>帳票種別</label><select id="docType"><option value="QUOTE">見積書</option><option value="INVOICE">請求書</option><option value="DELIVERY_NOTE">納品書</option><option value="RECEIPT">領収書</option><option value="PAYMENT_STATEMENT">支払明細書</option></select></div><div class="field"><label>発行日</label><input id="issueDate" type="date" /></div>
+          <div class="field"><label>支払期日</label><input id="dueDate" type="date" /></div>
+          <div class="field"><label>税計算方式</label><select id="priceMode"><option value="EXCL">外税（税別）</option><option value="INCL">内税（税込）</option></select></div>
+          <div class="field"><label>端数処理</label><select id="roundingMode"><option value="ROUND">四捨五入</option><option value="FLOOR">切り捨て</option><option value="CEIL">切り上げ</option></select></div>
+          <div class="field full"><label>件名</label><input id="title" type="text" placeholder="例: 2月分 ご請求書" /></div>
+          <div class="field full"><label>備考</label><textarea id="note"></textarea></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <strong>明細</strong>
+          <button class="btn-sub" type="button" onclick="addLine()">+ 明細追加</button>
+        </div>
+        <div id="lines"></div>
+      </div>
+
+      <button id="createBtn" class="btn-main" type="button" onclick="createInvoice()">作成してPDF生成</button>
+      <div id="status" class="status"></div>
+    </div>
+
+    <template id="lineTpl">
+      <div class="line-row">
+        <div class="line-head">明細 <span class="line-index"></span></div>
+        <div class="line-grid">
+          <div class="field"><label>品目</label><input data-k="item_name" type="text" /></div>
+          <div class="field"><label>数量</label><input data-k="qty" type="number" step="1" min="0" value="1" /></div>
+          <div class="field"><label>単位</label><input data-k="unit" type="text" value="式" /></div>
+          <div class="field"><label>単価</label><input data-k="unit_price" type="number" step="1" min="0" value="0" /></div>
+        </div>
+        <div class="line-grid2">
+          <div class="field"><label>行区分</label><select data-k="line_role"><option value="NORMAL">通常行（請求対象）</option><option value="INFO_ONLY">参考行（請求対象外）</option></select></div>
+          <div class="field"><label>税区分</label><select data-k="tax_category"><option value="TAX_10">課税10%</option><option value="TAX_8">課税8%</option><option value="NON_TAX">非課税</option></select></div>
+        </div>
+        <div class="row-actions"><button class="btn-danger" type="button" onclick="removeLine(this)">削除</button></div>
+      </div>
+    </template>
+
+    <script>
+      let inFlightTimer = null;
+
+      function ymd(d) {
+        const dt = d || new Date();
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const day = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+
+      function setStatus(text, ok) {
+        const el = document.getElementById('status');
+        el.textContent = text || '';
+        el.className = 'status' + (ok ? ' ok' : '');
+      }
+
+      function parseErrorMessage(err) {
+        if (!err) return '不明なエラーです。';
+        if (typeof err === 'string') return err;
+        if (err.message) return err.message;
+        if (err.toString) return err.toString();
+        return JSON.stringify(err);
+      }
+
+      function refreshLineIndex() {
+        [...document.querySelectorAll('.line-row')].forEach((row, i) => {
+          row.querySelector('.line-index').textContent = String(i + 1);
+        });
+      }
+
+      function addLine(seed) {
+        const tpl = document.getElementById('lineTpl');
+        const node = tpl.content.firstElementChild.cloneNode(true);
+        if (seed) {
+          node.querySelectorAll('[data-k]').forEach((el) => {
+            const k = el.getAttribute('data-k');
+            if (seed[k] !== undefined) el.value = seed[k];
+          });
+        }
+        document.getElementById('lines').appendChild(node);
+        refreshLineIndex();
+      }
+
+      function removeLine(btn) {
+        btn.closest('.line-row').remove();
+        refreshLineIndex();
+      }
+
+      function collectLines() {
+        return [...document.querySelectorAll('.line-row')].map((row) => {
+          const out = {};
+          row.querySelectorAll('[data-k]').forEach((el) => {
+            out[el.getAttribute('data-k')] = el.value;
+          });
+          return out;
+        });
+      }
+
+      function createInvoice() {
+        const btn = document.getElementById('createBtn');
+        btn.disabled = true;
+        setStatus('作成中...');
+
+        const payload = {
+          doc_type: document.getElementById('docType').value,
+          client_id: document.getElementById('client').value,
+          issue_date: document.getElementById('issueDate').value,
+          due_date: document.getElementById('dueDate').value,
+          title: document.getElementById('title').value,
+          note: document.getElementById('note').value,
+          price_mode: document.getElementById('priceMode').value,
+          rounding_mode: document.getElementById('roundingMode').value,
+          lines: collectLines()
+        };
+
+        clearTimeout(inFlightTimer);
+        inFlightTimer = setTimeout(() => {
+          btn.disabled = false;
+          setStatus('処理が長時間実行中です。Apps Scriptの実行ログを確認してください。');
+        }, 120000);
+
+        try {
+          google.script.run
+            .withSuccessHandler((res) => {
+              clearTimeout(inFlightTimer);
+              btn.disabled = false;
+              setStatus(`生成完了\nDoc ID: ${res.docId}\nPDF: ${res.pdfName}\n${res.pdfUrl}`, true);
+            })
+            .withFailureHandler((err) => {
+              clearTimeout(inFlightTimer);
+              btn.disabled = false;
+              setStatus(`エラー: ${parseErrorMessage(err)}`);
+            })
+            .createAndRenderInvoiceFromUi(payload);
+        } catch (e) {
+          clearTimeout(inFlightTimer);
+          btn.disabled = false;
+          setStatus(`エラー: ${parseErrorMessage(e)}`);
+        }
+      }
+
+      function init(data) {
+        const client = document.getElementById('client');
+        client.innerHTML = '';
+        (data.clients || []).forEach((c) => {
+          const opt = document.createElement('option');
+          opt.value = c.client_id;
+          opt.textContent = `${c.name} (${c.client_id})`;
+          client.appendChild(opt);
+        });
+
+        document.getElementById('issueDate').value = ymd(new Date());
+        const due = new Date();
+        due.setDate(due.getDate() + (data.default_payment_terms_days || 30));
+        document.getElementById('dueDate').value = ymd(due);
+        document.getElementById('priceMode').value = data.default_price_mode || 'EXCL';
+        document.getElementById('roundingMode').value = data.default_rounding_mode || 'ROUND';
+        document.getElementById('docType').value = 'INVOICE';
+        document.getElementById('title').value = 'ご請求書';
+
+        addLine({ item_name: '作業費', qty: 1, unit: '式', unit_price: 100000, line_role: 'NORMAL', tax_category: 'TAX_10' });
+      }
+
+      google.script.run
+        .withSuccessHandler(init)
+        .withFailureHandler((err) => setStatus(`初期化エラー: ${parseErrorMessage(err)}`))
+        .getInvoiceUiBootstrap();
+    </script>
+  </body>
+</html>

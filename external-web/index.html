@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>wf invoice external</title>
+  <style>
+    body { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; margin: 0; background: #f4f6fb; color: #1f2937; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 18px; }
+    .card { background: #fff; border: 1px solid #dbe3ef; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    h2 { margin: 0 0 8px; font-size: 16px; }
+    .grid { display: grid; gap: 8px; }
+    .g2 { grid-template-columns: 1fr 1fr; }
+    .g3 { grid-template-columns: 1fr 1fr 1fr; }
+    .field label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+    input, select, textarea, button { font: inherit; }
+    input, select, textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; }
+    textarea { min-height: 60px; }
+    button { border: 0; border-radius: 8px; padding: 9px 12px; cursor: pointer; font-weight: 700; }
+    .primary { background: #0f766e; color: #fff; }
+    .sub { background: #e0ecff; color: #1d4ed8; }
+    .warn { background: #fff7ed; color: #92400e; border: 1px solid #fdba74; }
+    .row { display: flex; gap: 8px; align-items: end; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #e2e8f0; padding: 6px; font-size: 13px; }
+    th { background: #f8fafc; color: #64748b; text-align: left; }
+    .status { min-height: 24px; font-size: 12px; color: #64748b; white-space: pre-line; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>帳票管理（外部Web）</h1>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="card">
+      <h2>新規作成</h2>
+      <div class="grid g3">
+        <div class="field"><label>帳票種別</label><select id="docType"></select></div>
+        <div class="field"><label>取引先</label><select id="clientId"></select></div>
+        <div class="field"><label>件名</label><input id="title" /></div>
+      </div>
+      <div class="grid g2" style="margin-top:8px;">
+        <div class="field"><label>発行日</label><input id="issueDate" type="date" /></div>
+        <div class="field"><label>期日</label><input id="dueDate" type="date" /></div>
+      </div>
+      <div class="grid g2" style="margin-top:8px;">
+        <div class="field"><label>税計算方式</label><select id="priceMode"><option value="EXCL">外税（税別）</option><option value="INCL">内税（税込）</option></select></div>
+        <div class="field"><label>端数処理</label><select id="roundingMode"><option value="ROUND">四捨五入</option><option value="FLOOR">切り捨て</option><option value="CEIL">切り上げ</option></select></div>
+      </div>
+      <div class="field" style="margin-top:8px;"><label>備考</label><textarea id="note"></textarea></div>
+
+      <h2 style="margin-top:12px;">明細</h2>
+      <div id="lines"></div>
+      <div class="row" style="margin-top:8px;">
+        <button class="sub" onclick="addLine()">+ 明細追加</button>
+        <button class="primary" onclick="createDoc()">作成してPDF生成</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>一覧 / 変換</h2>
+      <div class="row">
+        <button class="sub" onclick="reloadDocs()">再読込</button>
+      </div>
+      <table style="margin-top:8px;">
+        <thead><tr><th>doc_id</th><th>種別</th><th>取引先</th><th>件名</th><th>PDF</th><th>変換</th></tr></thead>
+        <tbody id="docs"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <template id="lineTpl">
+    <div class="card" style="margin:8px 0 0;padding:8px;">
+      <div class="grid g2">
+        <div class="field"><label>品目</label><input data-k="item_name" value="作業費" /></div>
+        <div class="field"><label>単価</label><input data-k="unit_price" type="number" value="100000" /></div>
+      </div>
+      <div class="grid g3" style="margin-top:6px;">
+        <div class="field"><label>数量</label><input data-k="qty" type="number" value="1" /></div>
+        <div class="field"><label>単位</label><input data-k="unit" value="式" /></div>
+        <div class="field"><label>税区分</label><select data-k="tax_category"><option value="TAX_10">課税10%</option><option value="TAX_8">課税8%</option><option value="NON_TAX">非課税</option></select></div>
+      </div>
+      <div class="field" style="margin-top:6px;"><label>行区分</label><select data-k="line_role"><option value="NORMAL">通常行</option><option value="INFO_ONLY">参考行</option></select></div>
+      <button class="warn" style="margin-top:6px;" onclick="this.parentElement.remove()">削除</button>
+    </div>
+  </template>
+
+  <script src="./main.js"></script>
+</body>
+</html>

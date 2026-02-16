@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>wf-invoice-system</title>
+    <style>
+      :root {
+        --bg: #f2f4f8;
+        --surface: #ffffff;
+        --ink: #1f2937;
+        --muted: #64748b;
+        --primary: #0f766e;
+        --line: #e2e8f0;
+        --danger: #b91c1c;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: linear-gradient(180deg, #f8fafc, var(--bg)); font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; }
+      .shell { max-width: 1220px; margin: 0 auto; padding: 20px; }
+      .hero { border-radius: 18px; background: linear-gradient(120deg, #0f766e, #0ea5a2); color: #fff; padding: 18px; margin-bottom: 16px; }
+      .hero h1 { margin: 0 0 6px; font-size: 22px; }
+      .hero p { margin: 0; opacity: .95; font-size: 13px; }
+      .cards { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin-top: 12px; }
+      .card { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3); border-radius: 12px; padding: 10px; }
+      .card .label { font-size: 11px; opacity: .9; }
+      .card .val { font-size: 20px; font-weight: 700; margin-top: 4px; }
+      .layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+      .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+      .panel h2 { margin: 0 0 10px; font-size: 16px; }
+      .toolbar { display: grid; grid-template-columns: 1fr 180px 120px 130px; gap: 8px; margin-bottom: 10px; }
+      input, select, textarea, button { font: inherit; }
+      input, select, textarea { width: 100%; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px; background: #fff; }
+      textarea { min-height: 70px; resize: vertical; }
+      button { border: 0; border-radius: 10px; padding: 9px 12px; cursor: pointer; font-weight: 600; }
+      .btn-main { background: var(--primary); color: #fff; }
+      .btn-sub { background: #eef2ff; color: #1e3a8a; }
+      .btn-link { background: #f8fafc; color: #0f172a; border: 1px solid #dbeafe; }
+      .btn-warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+      .btn-main:disabled, .btn-sub:disabled, .btn-link:disabled { opacity: .6; cursor: wait; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; }
+      th { font-size: 12px; color: var(--muted); background: #f8fafc; position: sticky; top: 0; }
+      .table-wrap { max-height: 460px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+      .state { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+      .state.DRAFT { background: #fee2e2; color: #991b1b; }
+      .state.READY { background: #fff7ed; color: #9a3412; }
+      .state.ISSUED { background: #dcfce7; color: #166534; }
+      .muted { color: var(--muted); font-size: 12px; }
+      .stack { display: grid; gap: 8px; }
+      .line-row { border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: #fbfffe; }
+      .line-grid { display: grid; grid-template-columns: minmax(180px,2fr) minmax(96px,1fr) minmax(96px,1fr) minmax(160px,1.3fr); gap: 8px; align-items: end; }
+      .line-grid.sub { grid-template-columns: minmax(240px,2fr) minmax(240px,2fr) auto; }
+      .detail { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #fcfcff; }
+      .status { white-space: pre-line; min-height: 32px; font-size: 12px; color: var(--muted); }
+      .status.ok { color: #166534; }
+      .status.err { color: var(--danger); }
+      .inline-actions { display: flex; gap: 8px; }
+      .subform { border: 1px dashed var(--line); border-radius: 10px; padding: 10px; background: #f8fafc; display: none; }
+      .subform.open { display: grid; gap: 8px; }
+      @media (max-width: 980px) {
+        .layout { grid-template-columns: 1fr; }
+        .cards { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+        .toolbar { grid-template-columns: 1fr 1fr; }
+        .line-grid, .line-grid.sub { grid-template-columns: 1fr 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <h1>帳票管理ダッシュボード</h1>
+        <p>見積書・請求書・納品書・領収書・支払明細書を作成/変換/再発行します。</p>
+        <div class="cards">
+          <div class="card"><div class="label">帳票件数</div><div id="sumInvoice" class="val">-</div></div>
+          <div class="card"><div class="label">発行済み</div><div id="sumIssued" class="val">-</div></div>
+          <div class="card"><div class="label">未発行/下書き</div><div id="sumDraft" class="val">-</div></div>
+          <div class="card"><div class="label">合計金額</div><div id="sumPayable" class="val">-</div></div>
+        </div>
+      </section>
+
+      <div class="layout">
+        <section class="panel">
+          <h2>帳票一覧</h2>
+          <div class="toolbar">
+            <input id="searchDoc" placeholder="doc_id / 件名 で検索" />
+            <select id="filterType">
+              <option value="">すべての種別</option>
+              <option value="QUOTE">見積書</option>
+              <option value="INVOICE">請求書</option>
+              <option value="DELIVERY_NOTE">納品書</option>
+              <option value="RECEIPT">領収書</option>
+              <option value="PAYMENT_STATEMENT">支払明細書</option>
+            </select>
+            <select id="filterState">
+              <option value="">状態すべて</option>
+              <option value="DRAFT">DRAFT</option>
+              <option value="READY">READY</option>
+              <option value="ISSUED">ISSUED</option>
+            </select>
+            <button class="btn-sub" onclick="reloadDocs()">再読込</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>doc_id</th><th>種別</th><th>取引先</th><th>件名</th><th>発行日</th><th>状態</th><th>金額</th><th>PDF</th><th>操作</th></tr>
+              </thead>
+              <tbody id="docsBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel stack">
+          <h2>新規帳票作成</h2>
+          <div class="stack">
+            <label class="muted">取引先</label>
+            <div class="inline-actions">
+              <select id="client" style="flex:1"></select>
+              <button class="btn-link" type="button" onclick="toggleClientForm()">+ 新規取引先</button>
+            </div>
+            <div id="clientForm" class="subform">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div><label class="muted">取引先名*</label><input id="newClientName" placeholder="例: 株式会社サンプル" /></div>
+                <div><label class="muted">敬称</label><input id="newClientHonorific" value="御中" /></div>
+              </div>
+              <button id="btnCreateClient" class="btn-sub" type="button" onclick="createClient()">取引先を登録</button>
+            </div>
+
+            <div><label class="muted">帳票種別</label><select id="docType"></select></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div><label class="muted">発行日</label><input id="issueDate" type="date" /></div>
+              <div><label class="muted">期日</label><input id="dueDate" type="date" /></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div><label class="muted">税計算方式</label><select id="priceMode"><option value="EXCL">外税（税別）</option><option value="INCL">内税（税込）</option></select></div>
+              <div><label class="muted">端数処理</label><select id="roundingMode"><option value="ROUND">四捨五入</option><option value="FLOOR">切り捨て</option><option value="CEIL">切り上げ</option></select></div>
+            </div>
+            <label class="muted">件名</label><input id="title" placeholder="例: ご請求書" />
+            <label class="muted">備考</label><textarea id="note"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;"><strong>明細</strong><button class="btn-link" type="button" onclick="addLine()">+ 明細追加</button></div>
+            <div id="lineBox" class="stack"></div>
+            <button id="btnCreate" class="btn-main" type="button" onclick="createDoc()">作成してPDF生成</button>
+          </div>
+
+          <h2>詳細 / 再発行 / 変換</h2>
+          <div class="detail" id="detailBox">一覧の「詳細」を選ぶと表示します。</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button id="btnRenderSelected" class="btn-warn" type="button" onclick="renderSelectedDoc()" disabled>選択docを再生成</button>
+            <button id="btnOpenPdf" class="btn-link" type="button" onclick="openSelectedPdf()" disabled>PDFを開く</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
+            <div>
+              <label class="muted">変換先帳票</label>
+              <select id="convertDocType">
+                <option value="QUOTE">見積書</option>
+                <option value="INVOICE">請求書</option>
+                <option value="DELIVERY_NOTE">納品書</option>
+                <option value="RECEIPT">領収書</option>
+                <option value="PAYMENT_STATEMENT">支払明細書</option>
+              </select>
+            </div>
+            <button id="btnConvertSelected" class="btn-sub" type="button" onclick="convertSelectedDoc()" disabled>別帳票へ変換して生成</button>
+          </div>
+          <div id="status" class="status"></div>
+        </section>
+      </div>
+    </div>
+
+    <template id="lineTpl">
+      <div class="line-row">
+        <div class="line-grid">
+          <div><label class="muted">品目</label><input data-k="item_name" /></div>
+          <div><label class="muted">数量</label><input data-k="qty" type="number" value="1" min="0" step="1" /></div>
+          <div><label class="muted">単位</label><input data-k="unit" value="式" /></div>
+          <div><label class="muted">単価</label><input data-k="unit_price" type="number" value="0" min="0" step="1" /></div>
+        </div>
+        <div class="line-grid sub" style="margin-top:8px;">
+          <div><label class="muted">行区分</label><select data-k="line_role"><option value="NORMAL">通常行（請求対象）</option><option value="INFO_ONLY">参考行（請求対象外）</option></select></div>
+          <div><label class="muted">税区分</label><select data-k="tax_category"><option value="TAX_10">課税10%</option><option value="TAX_8">課税8%</option><option value="NON_TAX">非課税</option></select></div>
+          <div style="display:flex;align-items:end;"><button class="btn-link" type="button" onclick="removeLine(this)">削除</button></div>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      const state = { docs: [], clients: [], docTypes: [], selectedDocId: '', selectedPdfUrl: '' };
+      const DOC_LABELS = {
+        QUOTE: '見積書', INVOICE: '請求書', DELIVERY_NOTE: '納品書', RECEIPT: '領収書', PAYMENT_STATEMENT: '支払明細書'
+      };
+
+      function fmtYmd(d){ const dt=d||new Date(); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
+      function fmtNum(n){ return Number(n||0).toLocaleString('ja-JP'); }
+      function setStatus(text, type){ const el=document.getElementById('status'); el.textContent=text||''; el.className='status '+(type||''); }
+      function parseError(err){ if(!err) return '不明なエラーです。'; if(typeof err==='string') return err; if(err.message) return err.message; return err.toString?err.toString():JSON.stringify(err); }
+      function callServer(fn,payload){ return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](payload)); }
+      function docLabel(code){ return DOC_LABELS[code] || code; }
+
+      function addLine(seed){
+        const node=document.getElementById('lineTpl').content.firstElementChild.cloneNode(true);
+        if(seed){ node.querySelectorAll('[data-k]').forEach((el)=>{ const k=el.getAttribute('data-k'); if(seed[k]!==undefined) el.value=seed[k]; }); }
+        document.getElementById('lineBox').appendChild(node);
+      }
+      function removeLine(btn){ const row=btn.closest('.line-row'); if(row) row.remove(); }
+      function collectLines(){ return [...document.querySelectorAll('#lineBox .line-row')].map((row)=>{ const out={}; row.querySelectorAll('[data-k]').forEach((el)=>out[el.getAttribute('data-k')]=el.value); return out; }); }
+
+      function fillSummary(summary){
+        document.getElementById('sumInvoice').textContent=fmtNum(summary.invoice_count);
+        document.getElementById('sumIssued').textContent=fmtNum(summary.issued_count);
+        document.getElementById('sumDraft').textContent=fmtNum(summary.draft_count);
+        document.getElementById('sumPayable').textContent=`¥${fmtNum(summary.payable_total)}`;
+      }
+      function fillClients(clients){
+        state.clients=clients||[];
+        const el=document.getElementById('client'); el.innerHTML='';
+        state.clients.forEach((c)=>{ const opt=document.createElement('option'); opt.value=c.client_id; opt.textContent=`${c.name} (${c.client_id})`; el.appendChild(opt); });
+      }
+      function fillDocTypes(docTypes){
+        state.docTypes=docTypes||[];
+        const el=document.getElementById('docType'); el.innerHTML='';
+        (docTypes||[]).forEach((d)=>{ const opt=document.createElement('option'); opt.value=d.code; opt.textContent=d.label; el.appendChild(opt); });
+      }
+
+      function rowHtml(doc){
+        const pdf = doc.latest_pdf_url ? `<a href="${doc.latest_pdf_url}" target="_blank">開く</a>` : '-';
+        const stateClass=doc.doc_state||'';
+        return `<tr>
+          <td>${doc.doc_id}</td><td>${docLabel(doc.doc_type)}</td><td>${doc.client_name||''}</td><td>${doc.title||''}</td><td>${doc.issue_date||''}</td>
+          <td><span class="state ${stateClass}">${stateClass||'-'}</span></td><td>¥${fmtNum(doc.total_payable)}</td><td>${pdf}</td>
+          <td><button class="btn-link" type="button" onclick="showDetail('${doc.doc_id}')">詳細</button></td>
+        </tr>`;
+      }
+
+      function applyTableFilter(){
+        const keyword=String(document.getElementById('searchDoc').value||'').trim().toLowerCase();
+        const type=document.getElementById('filterType').value;
+        const st=document.getElementById('filterState').value;
+        const filtered=state.docs.filter((doc)=>{
+          if(type && String(doc.doc_type)!==type) return false;
+          if(st && String(doc.doc_state)!==st) return false;
+          if(!keyword) return true;
+          return [doc.doc_id, doc.title, doc.client_name].join(' ').toLowerCase().includes(keyword);
+        });
+        document.getElementById('docsBody').innerHTML=filtered.map(rowHtml).join('') || '<tr><td colspan="9" class="muted">データがありません。</td></tr>';
+      }
+
+      async function reloadDocs(){
+        setStatus('一覧を取得しています...');
+        try{ state.docs=await callServer('listDocsForWeb',{limit:200}); applyTableFilter(); setStatus('一覧を更新しました。','ok'); }
+        catch(e){ setStatus(`一覧取得エラー: ${parseError(e)}`,'err'); }
+      }
+
+      async function showDetail(docId){
+        try{
+          const detail=await callServer('getDocDetailForWeb',docId);
+          state.selectedDocId=detail.doc.doc_id;
+          state.selectedPdfUrl=detail.doc.latest_pdf_url||'';
+          document.getElementById('btnRenderSelected').disabled=false;
+          document.getElementById('btnConvertSelected').disabled=false;
+          document.getElementById('btnOpenPdf').disabled=!state.selectedPdfUrl;
+
+          const lines=detail.lines.map((l)=>`<tr><td>${l.line_no}</td><td>${l.item_name}</td><td>${fmtNum(l.qty)}</td><td>${l.unit}</td><td>¥${fmtNum(l.unit_price)}</td><td>¥${fmtNum(l.amount)}</td><td>${l.line_role}</td></tr>`).join('');
+          document.getElementById('detailBox').innerHTML=`
+            <div><strong>${detail.doc.doc_id}</strong> / ${docLabel(detail.doc.doc_type)}</div>
+            <div class="muted">${detail.doc.client_name} / ${detail.doc.issue_date} / ${detail.doc.doc_state}</div>
+            <div style="margin-top:6px;">${detail.doc.title||''}</div>
+            <div style="margin-top:6px;">金額: <strong>¥${fmtNum(detail.doc.total_payable)}</strong></div>
+            <div style="margin-top:6px;">PDF: ${detail.doc.latest_pdf_url ? `<a href="${detail.doc.latest_pdf_url}" target="_blank">${detail.doc.latest_pdf_name||'開く'}</a>` : '-'}</div>
+            <div style="margin-top:8px;max-height:180px;overflow:auto;">
+              <table><thead><tr><th>No</th><th>品目</th><th>数量</th><th>単位</th><th>単価</th><th>金額</th><th>行区分</th></tr></thead><tbody>${lines||'<tr><td colspan="7">明細なし</td></tr>'}</tbody></table>
+            </div>`;
+        }catch(e){ setStatus(`詳細取得エラー: ${parseError(e)}`,'err'); }
+      }
+
+      function toggleClientForm(){ document.getElementById('clientForm').classList.toggle('open'); }
+
+      async function createClient(){
+        const btn=document.getElementById('btnCreateClient'); btn.disabled=true; setStatus('取引先を登録しています...');
+        try{
+          const created=await callServer('createClientForWeb',{ client_name:document.getElementById('newClientName').value, honorific:document.getElementById('newClientHonorific').value });
+          await refreshAll();
+          document.getElementById('client').value=created.client_id;
+          document.getElementById('clientForm').classList.remove('open');
+          document.getElementById('newClientName').value='';
+          setStatus(`取引先を登録しました: ${created.client_name} (${created.client_id})`,'ok');
+        }catch(e){ setStatus(`取引先登録エラー: ${parseError(e)}`,'err'); }
+        finally{ btn.disabled=false; }
+      }
+
+      async function createDoc(){
+        if(!document.getElementById('client').value){ setStatus('取引先が未選択です。','err'); return; }
+        const btn=document.getElementById('btnCreate'); btn.disabled=true; setStatus('帳票を作成してPDF生成しています...');
+        const payload={
+          doc_type: document.getElementById('docType').value || 'INVOICE',
+          client_id: document.getElementById('client').value,
+          issue_date: document.getElementById('issueDate').value,
+          due_date: document.getElementById('dueDate').value,
+          title: document.getElementById('title').value,
+          note: document.getElementById('note').value,
+          price_mode: document.getElementById('priceMode').value,
+          rounding_mode: document.getElementById('roundingMode').value,
+          lines: collectLines()
+        };
+        try{
+          const res=await callServer('createAndRenderDocFromUi',payload);
+          setStatus(`生成完了\n${docLabel(res.docType)} ${res.docId}\n${res.pdfName}\n${res.pdfUrl}`,'ok');
+          await refreshAll();
+          await showDetail(res.docId);
+        }catch(e){ setStatus(`作成エラー: ${parseError(e)}`,'err'); }
+        finally{ btn.disabled=false; }
+      }
+
+      async function renderSelectedDoc(){
+        if(!state.selectedDocId){ setStatus('先に一覧からdocを選択してください。','err'); return; }
+        const btn=document.getElementById('btnRenderSelected'); btn.disabled=true; setStatus(`再生成中: ${state.selectedDocId}`);
+        try{ const res=await callServer('renderInvoiceByDocIdForWeb',state.selectedDocId); setStatus(`再生成完了\n${res.pdfName}\n${res.pdfUrl}`,'ok'); await refreshAll(); await showDetail(state.selectedDocId); }
+        catch(e){ setStatus(`再生成エラー: ${parseError(e)}`,'err'); }
+        finally{ btn.disabled=false; }
+      }
+
+      async function convertSelectedDoc(){
+        if(!state.selectedDocId){ setStatus('先に一覧からdocを選択してください。','err'); return; }
+        const btn=document.getElementById('btnConvertSelected'); btn.disabled=true;
+        try{
+          const res=await callServer('convertDocForWeb',{ source_doc_id: state.selectedDocId, target_doc_type: document.getElementById('convertDocType').value, render_now: true });
+          setStatus(`変換完了\n新doc: ${res.new_doc_id}\n${res.pdf_url||''}`,'ok');
+          await refreshAll();
+          await showDetail(res.new_doc_id);
+        }catch(e){ setStatus(`変換エラー: ${parseError(e)}`,'err'); }
+        finally{ btn.disabled=false; }
+      }
+
+      function openSelectedPdf(){ if(state.selectedPdfUrl) window.open(state.selectedPdfUrl,'_blank','noopener,noreferrer'); }
+
+      async function refreshAll(){
+        const bootstrap=await callServer('getWebAppBootstrap');
+        fillSummary(bootstrap.summary||{});
+        fillClients(bootstrap.clients||[]);
+        fillDocTypes(bootstrap.doc_types||[]);
+        state.docs=bootstrap.docs||[];
+        applyTableFilter();
+      }
+
+      async function init(){
+        document.getElementById('searchDoc').addEventListener('input',applyTableFilter);
+        document.getElementById('filterType').addEventListener('change',applyTableFilter);
+        document.getElementById('filterState').addEventListener('change',applyTableFilter);
+        try{
+          const bootstrap=await callServer('getWebAppBootstrap');
+          fillSummary(bootstrap.summary||{});
+          fillClients(bootstrap.clients||[]);
+          fillDocTypes(bootstrap.doc_types||[]);
+          state.docs=bootstrap.docs||[];
+          applyTableFilter();
+
+          const defaults=bootstrap.defaults||{};
+          document.getElementById('issueDate').value=fmtYmd(new Date());
+          const due=new Date(); due.setDate(due.getDate()+Number(defaults.default_payment_terms_days||30));
+          document.getElementById('dueDate').value=fmtYmd(due);
+          document.getElementById('priceMode').value=defaults.default_price_mode||'EXCL';
+          document.getElementById('roundingMode').value=defaults.default_rounding_mode||'ROUND';
+          document.getElementById('docType').value='INVOICE';
+          document.getElementById('title').value='ご請求書';
+          addLine({ item_name:'作業費', qty:1, unit:'式', unit_price:100000, line_role:'NORMAL', tax_category:'TAX_10' });
+
+          if(!state.clients.length){ setStatus('取引先が未登録です。右側の「+ 新規取引先」から先に登録してください。','err'); }
+          else { setStatus('管理画面を読み込みました。','ok'); }
+        }catch(e){ setStatus(`初期化エラー: ${parseError(e)}`,'err'); }
+      }
+
+      init();
+    </script>
+  </body>
+</html>

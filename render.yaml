@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: wf-invoice-external-web
+    runtime: node
+    rootDir: external-web
+    buildCommand: "npm install"
+    startCommand: "npm run start"
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: GAS_WEBAPP_URL
+        sync: false
