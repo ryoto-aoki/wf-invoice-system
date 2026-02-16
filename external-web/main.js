@@ -179,9 +179,60 @@ async function init() {
   }
 }
 
+// --- 取引先モーダル ---
+function openClientModal() {
+  document.getElementById('cm_name').value = '';
+  document.getElementById('cm_honorific').value = '御中';
+  document.getElementById('cm_postal').value = '';
+  document.getElementById('cm_address').value = '';
+  document.getElementById('cm_contact').value = '';
+  document.getElementById('cm_email').value = '';
+  document.getElementById('cm_tel').value = '';
+  document.getElementById('cmStatus').textContent = '';
+  document.getElementById('clientModal').classList.add('open');
+}
+
+function closeClientModal() {
+  document.getElementById('clientModal').classList.remove('open');
+}
+
+async function submitClient() {
+  const name = document.getElementById('cm_name').value.trim();
+  if (!name) {
+    document.getElementById('cmStatus').textContent = '取引先名を入力してください';
+    return;
+  }
+  document.getElementById('cmStatus').textContent = '登録中...';
+  try {
+    const res = await apiPost('createClient', {
+      client_name: name,
+      honorific: document.getElementById('cm_honorific').value.trim(),
+      postal: document.getElementById('cm_postal').value.trim(),
+      address: document.getElementById('cm_address').value.trim(),
+      contact_person: document.getElementById('cm_contact').value.trim(),
+      email: document.getElementById('cm_email').value.trim(),
+      tel: document.getElementById('cm_tel').value.trim()
+    });
+    state.clients.push({ client_id: res.client_id, name: res.client_name, filename: res.client_name_for_filename });
+    refreshClientSelect(res.client_id);
+    closeClientModal();
+    setStatus(`取引先を登録しました: ${res.client_name} (${res.client_id})`);
+  } catch (e) {
+    document.getElementById('cmStatus').textContent = `エラー: ${e.message}`;
+  }
+}
+
+function refreshClientSelect(selectValue) {
+  renderSelect('clientId', state.clients.map((c) => ({ value: c.client_id, label: `${c.name} (${c.client_id})` })), 'value', 'label');
+  if (selectValue) document.getElementById('clientId').value = selectValue;
+}
+
 window.addLine = addLine;
 window.createDoc = createDoc;
 window.reloadDocs = reloadDocs;
 window.convertDoc = convertDoc;
+window.openClientModal = openClientModal;
+window.closeClientModal = closeClientModal;
+window.submitClient = submitClient;
 
 init();
