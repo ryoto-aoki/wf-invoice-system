@@ -43,7 +43,7 @@
       <h2>新規作成</h2>
       <div class="grid g3">
         <div class="field"><label>帳票種別</label><select id="docType"></select></div>
-        <div class="field"><label>取引先</label><div class="row"><select id="clientId" style="flex:1;"></select><button class="sub" style="white-space:nowrap;" onclick="openClientModal()">+ 新規</button></div></div>
+        <div class="field"><label>取引先</label><div class="row"><select id="clientId" style="flex:1;"></select><button class="sub" style="white-space:nowrap;" onclick="openClientModal()">+ 新規</button><button class="sub" style="white-space:nowrap;" onclick="openEditClientModal()">編集</button></div></div>
         <div class="field"><label>件名</label><input id="title" /></div>
       </div>
       <div class="grid g2" style="margin-top:8px;">
@@ -94,7 +94,7 @@
 
   <div class="overlay" id="clientModal">
     <div class="modal">
-      <h2>取引先を新規作成</h2>
+      <h2 id="cmTitle">取引先を新規作成</h2>
       <div class="grid g2">
         <div class="field"><label>取引先名（必須）</label><input id="cm_name" placeholder="例: 株式会社サンプル" /></div>
         <div class="field"><label>敬称</label><input id="cm_honorific" value="御中" /></div>
@@ -111,7 +111,7 @@
       <div class="status" id="cmStatus"></div>
       <div class="row" style="margin-top:12px; justify-content:flex-end;">
         <button class="warn" onclick="closeClientModal()">キャンセル</button>
-        <button class="primary" onclick="submitClient()">登録する</button>
+        <button class="primary" id="cmSubmitBtn" onclick="submitClient()">登録する</button>
       </div>
     </div>
   </div>

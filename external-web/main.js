@@ -179,20 +179,57 @@ async function init() {
   }
 }
 
-// --- 取引先モーダル ---
-function openClientModal() {
-  document.getElementById('cm_name').value = '';
-  document.getElementById('cm_honorific').value = '御中';
-  document.getElementById('cm_postal').value = '';
-  document.getElementById('cm_address').value = '';
-  document.getElementById('cm_contact').value = '';
-  document.getElementById('cm_email').value = '';
-  document.getElementById('cm_tel').value = '';
+// --- 取引先モーダル（新規 / 編集 共通） ---
+let editingClientId = null;
+
+function setModalFields(data) {
+  document.getElementById('cm_name').value = data.name || '';
+  document.getElementById('cm_honorific').value = data.honorific || '御中';
+  document.getElementById('cm_postal').value = data.postal || '';
+  document.getElementById('cm_address').value = data.address || '';
+  document.getElementById('cm_contact').value = data.contact_person || '';
+  document.getElementById('cm_email').value = data.email || '';
+  document.getElementById('cm_tel').value = data.tel || '';
   document.getElementById('cmStatus').textContent = '';
+}
+
+function openClientModal() {
+  editingClientId = null;
+  document.getElementById('cmTitle').textContent = '取引先を新規作成';
+  document.getElementById('cmSubmitBtn').textContent = '登録する';
+  setModalFields({});
+  document.getElementById('clientModal').classList.add('open');
+}
+
+function openEditClientModal() {
+  const sel = document.getElementById('clientId');
+  const clientId = sel.value;
+  if (!clientId) {
+    setStatus('編集する取引先を選択してください');
+    return;
+  }
+  const client = state.clients.find((c) => c.client_id === clientId);
+  if (!client) {
+    setStatus('取引先が見つかりません');
+    return;
+  }
+  editingClientId = clientId;
+  document.getElementById('cmTitle').textContent = `取引先を編集: ${client.name}`;
+  document.getElementById('cmSubmitBtn').textContent = '更新する';
+  setModalFields({
+    name: client.name || '',
+    honorific: client.honorific || '御中',
+    postal: client.postal || '',
+    address: client.address || '',
+    contact_person: client.contact_person || '',
+    email: client.email || '',
+    tel: client.tel || ''
+  });
   document.getElementById('clientModal').classList.add('open');
 }
 
 function closeClientModal() {
+  editingClientId = null;
   document.getElementById('clientModal').classList.remove('open');
 }
 
@@ -202,23 +239,61 @@ async function submitClient() {
     document.getElementById('cmStatus').textContent = '取引先名を入力してください';
     return;
   }
-  document.getElementById('cmStatus').textContent = '登録中...';
-  try {
-    const res = await apiPost('createClient', {
-      client_name: name,
-      honorific: document.getElementById('cm_honorific').value.trim(),
-      postal: document.getElementById('cm_postal').value.trim(),
-      address: document.getElementById('cm_address').value.trim(),
-      contact_person: document.getElementById('cm_contact').value.trim(),
-      email: document.getElementById('cm_email').value.trim(),
-      tel: document.getElementById('cm_tel').value.trim()
-    });
-    state.clients.push({ client_id: res.client_id, name: res.client_name, filename: res.client_name_for_filename });
-    refreshClientSelect(res.client_id);
-    closeClientModal();
-    setStatus(`取引先を登録しました: ${res.client_name} (${res.client_id})`);
-  } catch (e) {
-    document.getElementById('cmStatus').textContent = `エラー: ${e.message}`;
+
+  const payload = {
+    client_name: name,
+    honorific: document.getElementById('cm_honorific').value.trim(),
+    postal: document.getElementById('cm_postal').value.trim(),
+    address: document.getElementById('cm_address').value.trim(),
+    contact_person: document.getElementById('cm_contact').value.trim(),
+    email: document.getElementById('cm_email').value.trim(),
+    tel: document.getElementById('cm_tel').value.trim()
+  };
+
+  if (editingClientId) {
+    // --- 編集モード ---
+    document.getElementById('cmStatus').textContent = '更新中...';
+    try {
+      payload.client_id = editingClientId;
+      const res = await apiPost('updateClient', payload);
+      const idx = state.clients.findIndex((c) => c.client_id === editingClientId);
+      if (idx !== -1) {
+        state.clients[idx].name = res.client_name;
+        state.clients[idx].honorific = res.honorific || '';
+        state.clients[idx].postal = payload.postal;
+        state.clients[idx].address = payload.address;
+        state.clients[idx].contact_person = payload.contact_person;
+        state.clients[idx].email = payload.email;
+        state.clients[idx].tel = payload.tel;
+      }
+      refreshClientSelect(editingClientId);
+      closeClientModal();
+      setStatus(`取引先を更新しました: ${res.client_name} (${editingClientId})`);
+    } catch (e) {
+      document.getElementById('cmStatus').textContent = `エラー: ${e.message}`;
+    }
+  } else {
+    // --- 新規モード ---
+    document.getElementById('cmStatus').textContent = '登録中...';
+    try {
+      const res = await apiPost('createClient', payload);
+      state.clients.push({
+        client_id: res.client_id,
+        name: res.client_name,
+        filename: res.client_name_for_filename,
+        honorific: payload.honorific,
+        postal: payload.postal,
+        address: payload.address,
+        contact_person: payload.contact_person,
+        email: payload.email,
+        tel: payload.tel
+      });
+      refreshClientSelect(res.client_id);
+      closeClientModal();
+      setStatus(`取引先を登録しました: ${res.client_name} (${res.client_id})`);
+    } catch (e) {
+      document.getElementById('cmStatus').textContent = `エラー: ${e.message}`;
+    }
   }
 }
 
@@ -232,6 +307,7 @@ window.createDoc = createDoc;
 window.reloadDocs = reloadDocs;
 window.convertDoc = convertDoc;
 window.openClientModal = openClientModal;
+window.openEditClientModal = openEditClientModal;
 window.closeClientModal = closeClientModal;
 window.submitClient = submitClient;
 
