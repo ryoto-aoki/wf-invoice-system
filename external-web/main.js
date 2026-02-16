@@ -145,25 +145,37 @@ async function convertDoc(sourceDocId, targetType) {
 
 async function init() {
   setStatus('初期化中...');
+
+  // API 失敗でも帳票種別・日付・明細は使えるようにする
+  renderSelect('docType', DOC_TYPES_FALLBACK.map((d) => ({ value: d.code, label: d.label })), 'value', 'label');
+  document.getElementById('issueDate').value = ymd(new Date());
+  const defaultDue = new Date();
+  defaultDue.setDate(defaultDue.getDate() + 30);
+  document.getElementById('dueDate').value = ymd(defaultDue);
+  document.getElementById('title').value = 'ご請求書';
+  if (!document.querySelectorAll('#lines .card').length) addLine();
+
   try {
     const b = await apiGet('bootstrap');
     state.clients = b.clients || [];
     state.docTypes = b.doc_types || [];
 
     renderSelect('clientId', state.clients.map((c) => ({ value: c.client_id, label: `${c.name} (${c.client_id})` })), 'value', 'label');
-    const docTypeItems = (state.docTypes && state.docTypes.length) ? state.docTypes : DOC_TYPES_FALLBACK;
-    renderSelect('docType', docTypeItems.map((d) => ({ value: d.code, label: d.label })), 'value', 'label');
 
-    document.getElementById('issueDate').value = ymd(new Date());
-    const due = new Date(); due.setDate(due.getDate() + Number((b.defaults || {}).default_payment_terms_days || 30));
+    if (state.docTypes.length) {
+      renderSelect('docType', state.docTypes.map((d) => ({ value: d.code, label: d.label })), 'value', 'label');
+    }
+
+    const terms = Number((b.defaults || {}).default_payment_terms_days || 30);
+    const due = new Date();
+    due.setDate(due.getDate() + terms);
     document.getElementById('dueDate').value = ymd(due);
-    document.getElementById('title').value = 'ご請求書';
-    addLine();
+
     state.docs = b.docs || [];
     renderDocs();
     setStatus('準備完了');
   } catch (e) {
-    setStatus(`初期化エラー: ${e.message}`);
+    setStatus(`初期化エラー: ${e.message}\n※帳票種別・明細は手動入力で使えます`);
   }
 }
 
