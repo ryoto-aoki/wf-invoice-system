@@ -11,17 +11,35 @@ export default async function handler(req, res) {
     const incomingUrl = new URL(req.url, 'http://localhost');
     incomingUrl.searchParams.forEach((v, k) => target.searchParams.set(k, v));
 
-    const init = {
-      method: req.method,
-      headers: { 'Content-Type': req.headers['content-type'] || 'application/json' }
-    };
-
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
-      init.body = body;
+    const method = req.method;
+    const contentType = req.headers['content-type'] || 'application/json';
+    let body = undefined;
+    if (method !== 'GET' && method !== 'HEAD') {
+      body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
     }
 
-    const r = await fetch(target, init);
+    let r = await fetch(target.toString(), {
+      method,
+      headers: { 'Content-Type': contentType },
+      body,
+      redirect: 'manual'
+    });
+
+    // Google Apps Script は 302 リダイレクトを返す。
+    // リダイレクト先にも同じメソッド・ボディで再送する（最大 5 回）。
+    let redirects = 0;
+    while ((r.status === 301 || r.status === 302 || r.status === 307 || r.status === 308) && redirects < 5) {
+      const location = r.headers.get('location');
+      if (!location) break;
+      r = await fetch(location, {
+        method,
+        headers: { 'Content-Type': contentType },
+        body,
+        redirect: 'manual'
+      });
+      redirects++;
+    }
+
     const text = await r.text();
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
