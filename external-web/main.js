@@ -1,3 +1,12 @@
+// API から doc_types が返ってこない場合のフォールバック（帳票種別を必ず選べるようにする）
+const DOC_TYPES_FALLBACK = [
+  { code: 'QUOTE', label: '見積書' },
+  { code: 'INVOICE', label: '請求書' },
+  { code: 'DELIVERY_NOTE', label: '納品書' },
+  { code: 'RECEIPT', label: '領収書' },
+  { code: 'PAYMENT_STATEMENT', label: '支払明細書' }
+];
+
 const state = { clients: [], docTypes: [], docs: [] };
 
 function setStatus(msg) {
@@ -142,7 +151,8 @@ async function init() {
     state.docTypes = b.doc_types || [];
 
     renderSelect('clientId', state.clients.map((c) => ({ value: c.client_id, label: `${c.name} (${c.client_id})` })), 'value', 'label');
-    renderSelect('docType', state.docTypes.map((d) => ({ value: d.code, label: d.label })), 'value', 'label');
+    const docTypeItems = (state.docTypes && state.docTypes.length) ? state.docTypes : DOC_TYPES_FALLBACK;
+    renderSelect('docType', docTypeItems.map((d) => ({ value: d.code, label: d.label })), 'value', 'label');
 
     document.getElementById('issueDate').value = ymd(new Date());
     const due = new Date(); due.setDate(due.getDate() + Number((b.defaults || {}).default_payment_terms_days || 30));
