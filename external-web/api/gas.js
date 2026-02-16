@@ -9,7 +9,6 @@ export default async function handler(req, res) {
     }
 
     const target = new URL(gasUrl);
-
     const incomingUrl = new URL(req.url, 'http://localhost');
     incomingUrl.searchParams.forEach((v, k) => target.searchParams.set(k, v));
 
@@ -21,40 +20,36 @@ export default async function handler(req, res) {
       body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
     }
 
-    // GAS は 302 リダイレクトを返す。redirect: 'follow' だと POST→GET に変わるため、
-    // 手動でリダイレクトを追い、POST のまま送り直す。
-    let url = target.toString();
-    let response;
-    for (let i = 0; i < 6; i++) {
-      response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': contentType },
-        body,
-        redirect: 'manual'
-      });
+    // ---- ステップ 1: 元のリクエスト（POST or GET）を GAS に送る ----
+    const firstResponse = await fetch(target.toString(), {
+      method,
+      headers: { 'Content-Type': contentType },
+      body,
+      redirect: 'manual'
+    });
 
-      const status = response.status;
-      if (status >= 300 && status < 400) {
-        const location = response.headers.get('location');
-        if (location) {
-          url = location;
-          continue;
-        }
+    // ---- ステップ 2: リダイレクトを GET で追跡して結果を取得する ----
+    // GAS は処理後に 302 で結果 URL を返す。結果は GET で取りに行く。
+    let response = firstResponse;
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (location) {
+        response = await fetch(location, {
+          method: 'GET',
+          redirect: 'follow'
+        });
       }
-      break;
     }
 
     const text = await response.text();
 
-    // GAS がリダイレクト後に HTML を返した場合（ログイン画面など）を検知
+    // HTML が返ってきた場合のエラーハンドリング
     const trimmed = text.trimStart();
     if (trimmed.startsWith('<') || trimmed.startsWith('<!DOCTYPE')) {
       res.status(502).json({
         ok: false,
-        error: 'GAS が HTML を返しました。Apps Script の Web アプリが正しくデプロイされているか、アクセス権限を確認してください。',
-        hint: 'Apps Script → デプロイ → ウェブアプリ → アクセスできるユーザー を「全員」に設定してください。',
-        status: response.status,
-        url: url
+        error: 'GAS が HTML を返しました。Apps Script の Web アプリが正しくデプロイされているか確認してください。',
+        hint: 'Apps Script → デプロイ → 新しいデプロイ → アクセスできるユーザー を「全員」に設定してください。'
       });
       return;
     }
