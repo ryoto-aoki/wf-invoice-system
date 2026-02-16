@@ -1,4 +1,6 @@
 export default async function handler(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
   try {
     const gasUrl = process.env.GAS_WEBAPP_URL;
     if (!gasUrl) {
@@ -13,37 +15,51 @@ export default async function handler(req, res) {
 
     const method = req.method;
     const contentType = req.headers['content-type'] || 'application/json';
+
     let body = undefined;
     if (method !== 'GET' && method !== 'HEAD') {
       body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
     }
 
-    let r = await fetch(target.toString(), {
-      method,
-      headers: { 'Content-Type': contentType },
-      body,
-      redirect: 'manual'
-    });
-
-    // Google Apps Script は 302 リダイレクトを返す。
-    // リダイレクト先にも同じメソッド・ボディで再送する（最大 5 回）。
-    let redirects = 0;
-    while ((r.status === 301 || r.status === 302 || r.status === 307 || r.status === 308) && redirects < 5) {
-      const location = r.headers.get('location');
-      if (!location) break;
-      r = await fetch(location, {
+    // GAS は 302 リダイレクトを返す。redirect: 'follow' だと POST→GET に変わるため、
+    // 手動でリダイレクトを追い、POST のまま送り直す。
+    let url = target.toString();
+    let response;
+    for (let i = 0; i < 6; i++) {
+      response = await fetch(url, {
         method,
         headers: { 'Content-Type': contentType },
         body,
         redirect: 'manual'
       });
-      redirects++;
+
+      const status = response.status;
+      if (status >= 300 && status < 400) {
+        const location = response.headers.get('location');
+        if (location) {
+          url = location;
+          continue;
+        }
+      }
+      break;
     }
 
-    const text = await r.text();
+    const text = await response.text();
 
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.status(r.status).send(text);
+    // GAS がリダイレクト後に HTML を返した場合（ログイン画面など）を検知
+    const trimmed = text.trimStart();
+    if (trimmed.startsWith('<') || trimmed.startsWith('<!DOCTYPE')) {
+      res.status(502).json({
+        ok: false,
+        error: 'GAS が HTML を返しました。Apps Script の Web アプリが正しくデプロイされているか、アクセス権限を確認してください。',
+        hint: 'Apps Script → デプロイ → ウェブアプリ → アクセスできるユーザー を「全員」に設定してください。',
+        status: response.status,
+        url: url
+      });
+      return;
+    }
+
+    res.status(response.status).send(text);
   } catch (err) {
     res.status(500).json({ ok: false, error: String(err && err.message ? err.message : err) });
   }
