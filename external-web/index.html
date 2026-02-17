@@ -116,6 +116,25 @@
     </div>
   </div>
 
+  <div class="overlay" id="batchModal">
+    <div class="modal">
+      <h2 id="batchTitle">宛名違い一括作成</h2>
+      <p style="font-size:13px; color:#64748b; margin:0 0 8px;">
+        元の帳票の明細をコピーし、チェックした取引先ごとに帳票+PDFを一括作成します。
+      </p>
+      <div style="margin-bottom:8px;">
+        <button class="sub" style="font-size:12px;" onclick="batchSelectAll(true)">全選択</button>
+        <button class="sub" style="font-size:12px;" onclick="batchSelectAll(false)">全解除</button>
+      </div>
+      <div id="batchClientList" style="max-height:280px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; padding:8px;"></div>
+      <div class="status" id="batchStatus" style="margin-top:8px;"></div>
+      <div class="row" style="margin-top:12px; justify-content:flex-end;">
+        <button class="warn" onclick="closeBatchModal()">キャンセル</button>
+        <button class="primary" onclick="submitBatch()">一括作成</button>
+      </div>
+    </div>
+  </div>
+
   <script src="./main.js"></script>
 </body>
 </html>

@@ -69,26 +69,33 @@ function collectLines() {
   });
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function renderDocs() {
   const tbody = document.getElementById('docs');
   tbody.innerHTML = '';
   state.docs.forEach((d) => {
+    const id = escapeHtml(d.doc_id);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${d.doc_id}</td>
-      <td>${d.doc_type}</td>
-      <td>${d.client_name || ''}</td>
-      <td>${d.title || ''}</td>
-      <td>${d.latest_pdf_url ? `<a href="${d.latest_pdf_url}" target="_blank">開く</a>` : '-'}</td>
-      <td>
-        <select data-doc="${d.doc_id}">
+      <td>${id}</td>
+      <td>${escapeHtml(d.doc_type)}</td>
+      <td>${escapeHtml(d.client_name || '')}</td>
+      <td>${escapeHtml(d.title || '')}</td>
+      <td>${d.latest_pdf_url ? `<a href="${escapeHtml(d.latest_pdf_url)}" target="_blank">開く</a>` : '-'}</td>
+      <td style="white-space:nowrap;">
+        <select data-doc="${id}">
           <option value="QUOTE">見積書</option>
           <option value="INVOICE">請求書</option>
           <option value="DELIVERY_NOTE">納品書</option>
           <option value="RECEIPT">領収書</option>
           <option value="PAYMENT_STATEMENT">支払明細書</option>
         </select>
-        <button onclick="convertDoc('${d.doc_id}', this.previousElementSibling.value)">変換生成</button>
+        <button onclick="convertDoc('${id}', this.previousElementSibling.value)">変換</button>
+        <button class="sub" onclick="duplicateDoc('${id}')">複製</button>
+        <button class="sub" onclick="openBatchModal('${id}')">一括</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -302,13 +309,91 @@ function refreshClientSelect(selectValue) {
   if (selectValue) document.getElementById('clientId').value = selectValue;
 }
 
+// --- 複製 ---
+async function duplicateDoc(sourceDocId) {
+  if (!confirm(`${sourceDocId} を複製しますか？（同じ宛名・明細でコピーします）`)) return;
+  setStatus('複製中...');
+  try {
+    const res = await apiPost('duplicateDoc', { source_doc_id: sourceDocId });
+    setStatus(`複製完了: ${res.docId}\n${res.pdfUrl || ''}`);
+    await reloadDocs();
+  } catch (e) {
+    setStatus(`エラー: ${e.message}`);
+  }
+}
+
+// --- 宛名違い一括作成モーダル ---
+let batchSourceDocId = null;
+
+function openBatchModal(sourceDocId) {
+  batchSourceDocId = sourceDocId;
+  const src = state.docs.find((d) => d.doc_id === sourceDocId);
+  document.getElementById('batchTitle').textContent =
+    `一括作成（元: ${sourceDocId}${src ? ' / ' + (src.title || '') : ''})`;
+  document.getElementById('batchStatus').textContent = '';
+
+  const container = document.getElementById('batchClientList');
+  container.innerHTML = '';
+  state.clients.forEach((c) => {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex; align-items:center; gap:6px; padding:4px 0; cursor:pointer;';
+    label.innerHTML = `<input type="checkbox" value="${escapeHtml(c.client_id)}" style="width:auto;" />
+      <span>${escapeHtml(c.name)} (${escapeHtml(c.client_id)})</span>`;
+    container.appendChild(label);
+  });
+
+  document.getElementById('batchModal').classList.add('open');
+}
+
+function closeBatchModal() {
+  batchSourceDocId = null;
+  document.getElementById('batchModal').classList.remove('open');
+}
+
+function batchSelectAll(checked) {
+  document.querySelectorAll('#batchClientList input[type="checkbox"]').forEach((cb) => { cb.checked = checked; });
+}
+
+async function submitBatch() {
+  const checkboxes = document.querySelectorAll('#batchClientList input[type="checkbox"]:checked');
+  const clientIds = [...checkboxes].map((cb) => cb.value);
+  if (!clientIds.length) {
+    document.getElementById('batchStatus').textContent = '取引先を1つ以上選んでください';
+    return;
+  }
+  if (!confirm(`${clientIds.length} 社分の帳票を一括作成します。よろしいですか？`)) return;
+
+  document.getElementById('batchStatus').textContent = `作成中... (0/${clientIds.length})`;
+  try {
+    const res = await apiPost('batchCreateDoc', {
+      source_doc_id: batchSourceDocId,
+      client_ids: clientIds
+    });
+    let msg = `一括作成完了: ${res.total} 件成功`;
+    if (res.failed) msg += `、${res.failed} 件失敗`;
+    if (res.errors && res.errors.length) {
+      msg += '\n失敗: ' + res.errors.map((e) => `${e.client_id}: ${e.error}`).join(', ');
+    }
+    document.getElementById('batchStatus').textContent = msg;
+    setStatus(msg);
+    await reloadDocs();
+  } catch (e) {
+    document.getElementById('batchStatus').textContent = `エラー: ${e.message}`;
+  }
+}
+
 window.addLine = addLine;
 window.createDoc = createDoc;
 window.reloadDocs = reloadDocs;
 window.convertDoc = convertDoc;
+window.duplicateDoc = duplicateDoc;
 window.openClientModal = openClientModal;
 window.openEditClientModal = openEditClientModal;
 window.closeClientModal = closeClientModal;
 window.submitClient = submitClient;
+window.openBatchModal = openBatchModal;
+window.closeBatchModal = closeBatchModal;
+window.batchSelectAll = batchSelectAll;
+window.submitBatch = submitBatch;
 
 init();
