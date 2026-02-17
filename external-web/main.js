@@ -84,22 +84,38 @@ function renderDocs() {
       <td>${escapeHtml(d.doc_type)}</td>
       <td>${escapeHtml(d.client_name || '')}</td>
       <td>${escapeHtml(d.title || '')}</td>
-      <td>${d.latest_pdf_url ? `<a href="${escapeHtml(d.latest_pdf_url)}" target="_blank">開く</a>` : '-'}</td>
-      <td style="white-space:nowrap;">
-        <select data-doc="${id}">
-          <option value="QUOTE">見積書</option>
-          <option value="INVOICE">請求書</option>
-          <option value="DELIVERY_NOTE">納品書</option>
-          <option value="RECEIPT">領収書</option>
-          <option value="PAYMENT_STATEMENT">支払明細書</option>
-        </select>
-        <button onclick="convertDoc('${id}', this.previousElementSibling.value)">変換</button>
-        <button class="sub" onclick="duplicateDoc('${id}')">複製</button>
-        <button class="sub" onclick="openBatchModal('${id}')">一括</button>
+      <td>${d.latest_pdf_url ? `<a href="${escapeHtml(d.latest_pdf_url)}" target="_blank">PDF</a>` : '-'}</td>
+      <td>
+        <div class="action-wrap">
+          <button class="sub action-btn" onclick="toggleMenu(this)">操作 ▼</button>
+          <div class="action-menu">
+            <button onclick="promptConvert('${id}')">変換生成</button>
+            <button onclick="duplicateDoc('${id}')">複製</button>
+            <button onclick="openBatchModal('${id}')">宛名違い一括作成</button>
+          </div>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
   });
+}
+
+function toggleMenu(btn) {
+  const menu = btn.nextElementSibling;
+  const isOpen = menu.classList.contains('show');
+  closeAllMenus();
+  if (!isOpen) menu.classList.add('show');
+}
+
+function closeAllMenus() {
+  document.querySelectorAll('.action-menu.show').forEach((m) => m.classList.remove('show'));
+}
+
+function promptConvert(docId) {
+  closeAllMenus();
+  const type = prompt('変換先の種別を入力:\nQUOTE=見積書\nINVOICE=請求書\nDELIVERY_NOTE=納品書\nRECEIPT=領収書\nPAYMENT_STATEMENT=支払明細書', 'INVOICE');
+  if (!type) return;
+  convertDoc(docId, type.trim().toUpperCase());
 }
 
 async function reloadDocs() {
@@ -382,11 +398,17 @@ async function submitBatch() {
   }
 }
 
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.action-wrap')) closeAllMenus();
+});
+
 window.addLine = addLine;
 window.createDoc = createDoc;
 window.reloadDocs = reloadDocs;
 window.convertDoc = convertDoc;
 window.duplicateDoc = duplicateDoc;
+window.toggleMenu = toggleMenu;
+window.promptConvert = promptConvert;
 window.openClientModal = openClientModal;
 window.openEditClientModal = openEditClientModal;
 window.closeClientModal = closeClientModal;

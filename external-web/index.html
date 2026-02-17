@@ -30,6 +30,12 @@
     .overlay.open { display:flex; }
     .modal { background:#fff; border-radius:14px; padding:20px; width:min(460px,90vw); max-height:85vh; overflow-y:auto; }
     .modal h2 { margin:0 0 12px; }
+    .action-wrap { position: relative; display: inline-block; }
+    .action-btn { font-size: 12px; padding: 5px 10px; }
+    .action-menu { display:none; position:absolute; right:0; top:100%; z-index:50; background:#fff; border:1px solid #dbe3ef; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.12); min-width:140px; padding:4px 0; }
+    .action-menu.show { display:block; }
+    .action-menu button { display:block; width:100%; text-align:left; background:none; border:0; border-radius:0; padding:8px 14px; font-size:13px; font-weight:500; color:#1f2937; }
+    .action-menu button:hover { background:#f1f5f9; }
   </style>
 </head>
 <body>
@@ -70,7 +76,7 @@
         <button class="sub" onclick="reloadDocs()">再読込</button>
       </div>
       <table style="margin-top:8px;">
-        <thead><tr><th>doc_id</th><th>種別</th><th>取引先</th><th>件名</th><th>PDF</th><th>変換</th></tr></thead>
+        <thead><tr><th>doc_id</th><th>種別</th><th>取引先</th><th>件名</th><th>PDF</th><th>操作</th></tr></thead>
         <tbody id="docs"></tbody>
       </table>
     </div>
